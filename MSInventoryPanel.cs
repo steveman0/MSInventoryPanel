@@ -1,9 +1,7 @@
-﻿using System;
-using System.IO;
-using System.Collections.Generic;
-using System.Collections;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using FortressCraft.Community.Utilities;
 
 public class MSInventoryPanel : MachineEntity//, PowerConsumerInterface
 {
@@ -32,11 +30,13 @@ public class MSInventoryPanel : MachineEntity//, PowerConsumerInterface
     public int[] quant;
     public string[] itemnames;
     private int scrollindex = 0;
-    private bool autoscroll = true;
+    private bool autoscroll = false;
     private float paneldebounce = 0.0f;
+    public List<KeyValuePair<ItemBase, int>> Inventory;
 
-    public MSInventoryPanel(Segment segment, long x, long y, long z, ushort cube, byte flags, ushort lValue, bool loadFromDisk)
-      : base(eSegmentEntity.Mod, SpawnableObjectEnum.ServerMonitor, x, y, z, cube, flags, lValue, Vector3.zero, segment)
+
+    public MSInventoryPanel(ModCreateSegmentEntityParameters parameters)
+      : base(parameters)
     {
         this.mbNeedsLowFrequencyUpdate = true;
         this.mbNeedsUnityUpdate = true;
@@ -187,8 +187,8 @@ public class MSInventoryPanel : MachineEntity//, PowerConsumerInterface
                 //Debug.Log("Tried to print an item that doesn't exist in the list! GET OUT!");
                 break;
             }
-            str4 = itemnames[printline].ToString();
-            str2 = str2 + "\n" + quant[printline].ToString("N0") + str4.Substring(1) ;
+            str4 = itemnames[printline];
+            str2 = str2 + "\n" + quant[printline].ToString("N0") + "x " + str4;
         }
         string str3 = string.Concat(new object[2]
         {
@@ -214,68 +214,152 @@ public class MSInventoryPanel : MachineEntity//, PowerConsumerInterface
         {
             //ScanDelay sets the refresh interval
             this.mrScanDelay = 1f;
-            //Clear arrays from last use so we don't have phantom items
-            ItemBase pickeditem = null;
-            string itemname = "";
-            Dictionary<string, int> items = new Dictionary<string, int>();
+            if (this.massStorageCrate == null)
+                this.SearchForCrateNeighbours(this.mnX, this.mnY, this.mnZ);
+            else
+                this.BuildInventoryList();
+            ////Clear arrays from last use so we don't have phantom items
+            //ItemBase pickeditem = null;
+            //string itemname = "";
+            //Dictionary<string, int> items = new Dictionary<string, int>();
 
 
-            //Loop over all crates and collect all items into a list
-            if (massStorageCrate != null)
+            ////Loop over all crates and collect all items into a list
+            //if (massStorageCrate != null)
+            //{
+            //    for (int index = 0; index < this.massStorageCrate.mConnectedCrates.Count + 1; ++index)
+            //    {
+            //        for (int index2 = 0; index2 < massStorageCrate.STORAGE_CRATE_SIZE; ++index2)
+            //        {
+            //            if (index == this.massStorageCrate.mConnectedCrates.Count) //Center crate!
+            //            {
+            //                if (massStorageCrate.mMode == MassStorageCrate.CrateMode.Items)
+            //                    pickeditem = (massStorageCrate.mItems[index2]);
+            //                else
+            //                    pickeditem = massStorageCrate.mItem;
+            //            }
+            //            else
+            //            {
+            //                if (massStorageCrate.mMode == MassStorageCrate.CrateMode.Items)
+            //                    pickeditem = (massStorageCrate.mConnectedCrates[index].mItems[index2]);
+            //                else
+            //                    pickeditem = massStorageCrate.mConnectedCrates[index].mItem;
+            //            }
+            //            if (pickeditem != null)
+            //            {
+            //                itemname = ItemManager.GetItemName(pickeditem);
+            //                if (!items.ContainsKey(itemname))
+            //                {
+            //                    items.Add(itemname, pickeditem.GetAmount());
+            //                }
+            //                else
+            //                {
+            //                    items[itemname] = items[itemname] + pickeditem.GetAmount();
+            //                }
+            //                pickeditem = null;
+                            
+            //            }
+            //            if (massStorageCrate.mMode == MassStorageCrate.CrateMode.SingleStack)
+            //                break;
+            //        }
+            //    }
+            //}
+            ////No mass storage crate associated... find one!
+            //else
+            //{
+            //    SearchForCrateNeighbours(this.mnX, this.mnY, this.mnZ);
+            //}
+
+
+            ////Group like items in the list and output the quantities to arrays
+            //int index3 = 0;
+            //if (items.Count == 0)
+            //    return;
+            //else
+            //{
+            //    this.itemnames = new string[items.Count];
+            //    this.quant = new int[items.Count];
+            //    var sortlist = items.Keys.ToList();
+            //    sortlist.Sort();
+
+            //    foreach (var key in sortlist)
+            //    {
+            //        this.itemnames[index3] = key;
+            //        this.quant[index3] = items[key];
+            //        index3++;
+            //    }
+            //}
+        }
+    }
+
+    public void BuildInventoryList()
+    {
+        List<KeyValuePair<ItemBase, int>> items = new List<KeyValuePair<ItemBase, int>>();
+
+        for (int index = 0; index <= this.massStorageCrate.mConnectedCrates.Count; index++)
+        {
+            MassStorageCrate crate;
+            ItemBase item;
+            if (index == this.massStorageCrate.mConnectedCrates.Count)
+                crate = this.massStorageCrate;
+            else
+                crate = this.massStorageCrate.mConnectedCrates[index];
+
+            if (crate.mMode == MassStorageCrate.CrateMode.SingleStack)
             {
-                for (int index = 0; index < this.massStorageCrate.mConnectedCrates.Count+1; ++index)
+                item = crate.mItem;
+                if (item != null)
                 {
-                    for (int index2 = 0; index2 < massStorageCrate.STORAGE_CRATE_SIZE; ++index2)
+                    int loc = items.FindIndex(x => x.Key.Compare(item));
+                    if (loc != -1)
+                        items[loc] = new KeyValuePair<ItemBase, int>(items[loc].Key, items[loc].Value + item.GetAmount());
+                    else
                     {
-                        if (index == this.massStorageCrate.mConnectedCrates.Count) //Center crate!
-                        {
-                            if (massStorageCrate.mItems[index2] != null)
-                                pickeditem = (massStorageCrate.mItems[index2]);
-                        }
-                        else if (massStorageCrate.mConnectedCrates[index].mItems[index2] != null)
-                        {
-                            pickeditem = (massStorageCrate.mConnectedCrates[index].mItems[index2]);
-                        }
-                        if (pickeditem != null)
-                        {
-                            itemname = pickeditem.ToString();
-                            if (!items.ContainsKey(itemname))
-                            {
-                                items.Add(itemname, 1);
-                            }
-                            else
-                            {
-                                items[itemname] = (int)items[itemname] + 1;
-                            }
-                            pickeditem = null;
-                        }   
+                        items.Add(new KeyValuePair<ItemBase, int>(ItemBaseUtil.NewInstance(item), item.GetAmount()));
                     }
                 }
             }
-            //No mass storage crate associated... find one!
             else
             {
-                SearchForCrateNeighbours(this.mnX, this.mnY, this.mnZ);
+                for (int n = 0; n < crate.STORAGE_CRATE_SIZE; n++)
+                {
+                    item = crate.mItems[n];
+                    if (item != null)
+                    {
+                        int loc = items.FindIndex(x => x.Key.Compare(item));
+                        if (loc != -1)
+                            items[loc] = new KeyValuePair<ItemBase, int>(items[loc].Key, items[loc].Value + item.GetAmount());
+                        else
+                        {
+                            items.Add(new KeyValuePair<ItemBase, int>(ItemBaseUtil.NewInstance(item), item.GetAmount()));
+                        }
+                        item = null;
+                    }
+                }
+            }
+        }
+        this.Inventory = items;
+
+        int index3 = 0;
+        if (items.Count == 0)
+            return;
+        else
+        {
+            Dictionary<string, int> items2 = new Dictionary<string, int>();
+            foreach (KeyValuePair<ItemBase, int> kvp in items)
+            {
+                items2.Add((kvp.Key.ToString()).Split('x')[1], kvp.Value);
             }
 
-
-            //Group like items in the list and output the quantities to arrays
-            int index3 = 0;
-            if (items.Count == 0)
-                return;
-            else
+            this.itemnames = new string[items2.Count];
+            this.quant = new int[items2.Count];
+            var sortlist = items2.Keys.ToList();
+            sortlist.Sort();
+            foreach (var key in sortlist)
             {
-                this.itemnames = new string[items.Count];
-                this.quant = new int[items.Count];
-                var sortlist = items.Keys.ToList();
-                sortlist.Sort();
-
-                foreach (var key in sortlist)
-                {
-                    this.itemnames[index3] = key;
-                    this.quant[index3] = items[key];
-                    index3++;
-                }
+                this.itemnames[index3] = key;
+                this.quant[index3] = items2[key];
+                index3++;
             }
         }
     }

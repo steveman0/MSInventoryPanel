@@ -4,14 +4,14 @@ using UnityEngine;
 
 public class MSInventoryMod : FortressCraftMod
 {
+    public static ushort paneltype = ModManager.mModMappings.CubesByKey["steveman0.MSInventoryPanel"].CubeType;
 
     public override ModRegistrationData Register()
     {
         ModRegistrationData modRegistrationData = new ModRegistrationData();
         modRegistrationData.RegisterEntityHandler("steveman0.MSInventoryPanel");
 
-
-        Debug.Log("Mass Storage Inventory Panel Mod v1.2 registered");
+        Debug.Log("Mass Storage Inventory Panel Mod v4 registered");
 
         return modRegistrationData;
     }
@@ -20,13 +20,10 @@ public class MSInventoryMod : FortressCraftMod
     {
         ModCreateSegmentEntityResults result = new ModCreateSegmentEntityResults();
 
-        foreach (ModCubeMap cubeMap in ModManager.mModMappings.CubeTypes)
+        if (parameters.Cube == paneltype)
         {
-            if (cubeMap.CubeType == parameters.Cube)
-            {
-                if (cubeMap.Key.Equals("steveman0.MSInventoryPanel"))
-                    result.Entity = new MSInventoryPanel(parameters.Segment, parameters.X, parameters.Y, parameters.Z, parameters.Cube, parameters.Flags, parameters.Value, parameters.LoadFromDisk);
-            }
+            parameters.ObjectType = SpawnableObjectEnum.ServerMonitor;
+            result.Entity = new MSInventoryPanel(parameters);
         }
         return result;
     }
